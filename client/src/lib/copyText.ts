@@ -25,10 +25,12 @@ export async function copyText(text: string): Promise<boolean> {
   }
 }
 
-/** Ссылка для гостей: только room ID, без имени и create. */
+/** Ссылка для гостей (HashRouter: путь в #, без name/create). */
 export function getShareableRoomUrl(): string {
-  const url = new URL(window.location.href)
-  url.searchParams.delete('create')
-  url.searchParams.delete('name')
-  return url.toString()
+  const base = `${window.location.origin}${window.location.pathname}`
+  const match = window.location.hash.match(/^#\/room\/([a-z0-9]+)/)
+  if (match) {
+    return `${base}#/room/${match[1]}`
+  }
+  return `${base}#/`
 }

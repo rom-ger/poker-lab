@@ -31,10 +31,12 @@ npm run dev
 ```bash
 cd client
 npm run build
-# залить содержимое client/dist на любой static hosting
+# залить содержимое client/dist на хостинг
 ```
 
-Примеры: GitHub Pages, Cloudflare Pages, Netlify, S3 + CloudFront.
+### Роутинг: HashRouter
+
+Ссылки вида `https://poker-lab.spisoknado.ru/#/room/abc123` — сервер отдаёт только `index.html`, отдельная настройка nginx не нужна.
 
 **Переменные окружения не обязательны** — по умолчанию `0.peerjs.com`.
 
