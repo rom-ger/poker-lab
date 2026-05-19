@@ -1,8 +1,11 @@
 import Peer, { type DataConnection } from 'peerjs'
-import { hostPeerId, PEERJS_CONFIG } from './constants'
+import { createPeerOptions, hostPeerId } from './constants'
 import type { DataMessage, RoomState, WireMessage } from '../types'
 
 export type DataHandler = (msg: DataMessage, fromPeerId: string) => void
+
+const ICE_FAILED_MSG =
+  'P2P не установился (NAT или firewall). Попробуйте одну Wi‑Fi сеть или настройте TURN (см. README).'
 
 export class PeerManager {
   private peer: Peer | null = null
@@ -16,6 +19,7 @@ export class PeerManager {
   private onGuestLeft = (_peerId: string) => {}
   private onHostLost = () => {}
   private onRequestState: () => RoomState | null = () => null
+  private onIceFailed = () => {}
 
   configure(handlers: {
     onData: DataHandler
@@ -23,12 +27,35 @@ export class PeerManager {
     onGuestLeft?: (peerId: string) => void
     onHostLost?: () => void
     onRequestState?: () => RoomState | null
+    onIceFailed?: () => void
   }) {
     this.onData = handlers.onData
     this.onGuestJoined = handlers.onGuestJoined ?? (() => {})
     this.onGuestLeft = handlers.onGuestLeft ?? (() => {})
     this.onHostLost = handlers.onHostLost ?? (() => {})
     this.onRequestState = handlers.onRequestState ?? (() => null)
+    this.onIceFailed = handlers.onIceFailed ?? (() => {})
+  }
+
+  private watchIce(
+    conn: DataConnection,
+    onFail: () => void,
+  ) {
+    const pc = conn.peerConnection
+    if (!pc) return
+
+    const check = () => {
+      const state = pc.iceConnectionState
+      if (state === 'failed' || state === 'closed') {
+        onFail()
+      }
+    }
+
+    pc.addEventListener('iceconnectionstatechange', check)
+    pc.addEventListener('connectionstatechange', () => {
+      if (pc.connectionState === 'failed') onFail()
+    })
+    check()
   }
 
   private isStale(gen: number) {
@@ -168,7 +195,7 @@ export class PeerManager {
     return new Promise((resolve, reject) => {
       this.destroyInternal(false)
 
-      const peer = new Peer(id, PEERJS_CONFIG)
+      const peer = new Peer(id, createPeerOptions())
       this.peer = peer
 
       this.armTimeout(gen, reject)
@@ -214,7 +241,7 @@ export class PeerManager {
     return new Promise((resolve, reject) => {
       this.destroyInternal(false)
 
-      const peer = new Peer(localPeerId, PEERJS_CONFIG)
+      const peer = new Peer(localPeerId, createPeerOptions())
       this.peer = peer
 
       this.armTimeout(gen, reject)
@@ -231,12 +258,24 @@ export class PeerManager {
         const conn = peer.connect(targetId, { reliable: true })
         this.wireGuestConnection(conn, localPeerId, name)
 
+        let settled = false
+        const settle = (fn: () => void) => {
+          if (settled || this.isStale(gen)) return
+          settled = true
+          finish(fn)
+        }
+
+        this.watchIce(conn, () => {
+          this.onIceFailed()
+          settle(() => reject(new Error(ICE_FAILED_MSG)))
+        })
+
         conn.on('open', () => {
-          finish(() => resolve())
+          settle(() => resolve())
         })
 
         conn.on('error', () => {
-          finish(() =>
+          settle(() =>
             reject(new Error('Не удалось подключиться к хосту комнаты')),
           )
         })

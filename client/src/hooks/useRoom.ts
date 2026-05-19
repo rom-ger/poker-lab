@@ -179,6 +179,15 @@ export function useRoom(
         if (!mounted.current || isHostRef.current) return
         scheduleReconnectRef.current()
       },
+      onIceFailed: () => {
+        if (!mounted.current) return
+        useRoomStore
+          .getState()
+          .setError(
+            'P2P не установился. Одна Wi‑Fi сеть часто помогает; иначе нужен TURN (VITE_TURN_* в .env).',
+          )
+        useRoomStore.getState().setConnectionStatus('error')
+      },
     })
 
     const savedHost = sessionStorage.getItem(STORAGE_HOST_ROOM_KEY)

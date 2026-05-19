@@ -61,8 +61,24 @@ VITE_PEERJS_SECURE=true
 ## Ограничения
 
 - Зависимость от **PeerJS Cloud** (бесплатный, без SLA).
-- За строгим NAT может понадобиться **TURN** (не настроен).
+- **Разные сети / NAT:** без TURN P2P может не установиться (в Firefox: `ICE failed`, в Chrome — вечный спиннер).
+- Встроенный TURN PeerJS (`turn.peerjs.com`) **отключён** — он часто не работает.
 - Публичный Peer ID комнаты `poker-{roomId}` — любой, кто знает ID, может попытаться войти.
+
+### TURN (если гость не подключается)
+
+1. Зарегистрируйтесь на [Metered Open Relay](https://www.metered.ca/tools/openrelay/) (или свой coturn).
+2. В `client/.env.production`:
+
+```
+VITE_TURN_URLS=turn:standard.relay.metered.ca:80,turn:standard.relay.metered.ca:443
+VITE_TURN_USERNAME=...
+VITE_TURN_CREDENTIAL=...
+```
+
+3. `npm run build` и задеплойте заново.
+
+**Быстрая проверка:** хост и гость в **одной Wi‑Fi** — часто работает и без TURN.
 
 ## Стек
 
