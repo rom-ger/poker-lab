@@ -1,10 +1,8 @@
 import Peer, { type DataConnection } from 'peerjs'
 import { hostPeerId, PEERJS_CONFIG } from './constants'
-import type { DataMessage } from '../types'
+import type { DataMessage, RoomState, WireMessage } from '../types'
 
 export type DataHandler = (msg: DataMessage, fromPeerId: string) => void
-
-type WireMessage = DataMessage | { type: 'HELLO'; peerId: string; name: string }
 
 export class PeerManager {
   private peer: Peer | null = null
@@ -12,21 +10,25 @@ export class PeerManager {
   private hostConnection: DataConnection | null = null
   private generation = 0
   private connectTimeout: ReturnType<typeof setTimeout> | null = null
+  private statePollInterval: ReturnType<typeof setInterval> | null = null
   private onData: DataHandler = () => {}
   private onGuestJoined = (_peerId: string, _name: string) => {}
   private onGuestLeft = (_peerId: string) => {}
   private onHostLost = () => {}
+  private onRequestState: () => RoomState | null = () => null
 
   configure(handlers: {
     onData: DataHandler
     onGuestJoined?: (peerId: string, name: string) => void
     onGuestLeft?: (peerId: string) => void
     onHostLost?: () => void
+    onRequestState?: () => RoomState | null
   }) {
     this.onData = handlers.onData
     this.onGuestJoined = handlers.onGuestJoined ?? (() => {})
     this.onGuestLeft = handlers.onGuestLeft ?? (() => {})
     this.onHostLost = handlers.onHostLost ?? (() => {})
+    this.onRequestState = handlers.onRequestState ?? (() => null)
   }
 
   private isStale(gen: number) {
@@ -40,7 +42,14 @@ export class PeerManager {
     }
   }
 
-  private armTimeout(gen: number, reject: (e: Error) => void, ms = 20000) {
+  private clearStatePoll() {
+    if (this.statePollInterval) {
+      clearInterval(this.statePollInterval)
+      this.statePollInterval = null
+    }
+  }
+
+  private armTimeout(gen: number, reject: (e: Error) => void, ms = 25000) {
     this.clearConnectTimeout()
     this.connectTimeout = setTimeout(() => {
       if (!this.isStale(gen)) {
@@ -50,15 +59,26 @@ export class PeerManager {
   }
 
   private parse(raw: unknown): WireMessage | null {
-    try {
-      return JSON.parse(String(raw)) as WireMessage
-    } catch {
-      return null
+    if (raw && typeof raw === 'object' && 'type' in raw) {
+      return raw as WireMessage
     }
+    if (typeof raw === 'string') {
+      try {
+        return JSON.parse(raw) as WireMessage
+      } catch {
+        return null
+      }
+    }
+    return null
   }
 
   private send(conn: DataConnection, msg: WireMessage) {
     if (conn.open) conn.send(msg)
+  }
+
+  private sendStateTo(conn: DataConnection) {
+    const state = this.onRequestState()
+    if (state) this.send(conn, { type: 'STATE', payload: state })
   }
 
   private wireGuestConnection(
@@ -68,18 +88,38 @@ export class PeerManager {
   ) {
     this.hostConnection = conn
 
-    conn.on('open', () => {
+    const sendHello = () => {
       this.send(conn, { type: 'HELLO', peerId: localPeerId, name })
+    }
+
+    const requestState = () => {
+      this.send(conn, { type: 'REQUEST_STATE', peerId: localPeerId })
+    }
+
+    conn.on('open', () => {
+      sendHello()
+      requestState()
+      setTimeout(sendHello, 500)
+      setTimeout(requestState, 500)
+
+      this.clearStatePoll()
+      this.statePollInterval = setInterval(requestState, 1500)
     })
 
     conn.on('data', (raw) => {
       const msg = this.parse(raw)
-      if (!msg || msg.type === 'HELLO') return
+      if (!msg || msg.type === 'HELLO' || msg.type === 'REQUEST_STATE') return
+
+      if (msg.type === 'STATE') {
+        this.clearStatePoll()
+      }
+
       const from = msg.type === 'ACTION' ? msg.from : 'host'
       this.onData(msg, from)
     })
 
     conn.on('close', () => {
+      this.clearStatePoll()
       this.hostConnection = null
       this.onHostLost()
     })
@@ -95,11 +135,19 @@ export class PeerManager {
       if (msg.type === 'HELLO') {
         this.connections.set(msg.peerId, conn)
         this.onGuestJoined(msg.peerId, msg.name)
+        this.sendStateTo(conn)
         return
       }
 
-      const from = msg.type === 'ACTION' ? msg.from : remoteId
-      this.onData(msg, from)
+      if (msg.type === 'REQUEST_STATE') {
+        this.sendStateTo(conn)
+        return
+      }
+
+      if (msg.type === 'STATE' || msg.type === 'ACTION') {
+        const from = msg.type === 'ACTION' ? msg.from : remoteId
+        this.onData(msg, from)
+      }
     })
 
     conn.on('close', () => {
@@ -233,6 +281,7 @@ export class PeerManager {
 
   private destroyInternal(bumpGeneration: boolean) {
     this.clearConnectTimeout()
+    this.clearStatePoll()
     if (bumpGeneration) this.generation++
 
     this.hostConnection?.close()

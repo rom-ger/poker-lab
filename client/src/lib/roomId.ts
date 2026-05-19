@@ -1,7 +1,9 @@
+import { getRandomBytes } from './randomId'
+
 const ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789'
 
 export function generateRoomId(length = 8): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(length))
+  const bytes = getRandomBytes(length)
   return Array.from(bytes, (b) => ALPHABET[b % ALPHABET.length]).join('')
 }
 

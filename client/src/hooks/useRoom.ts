@@ -29,9 +29,17 @@ export function useRoom(
     peerManager.broadcast({ type: 'STATE', payload: snapshot })
   }, [])
 
+  const markSynced = useCallback(() => {
+    const self = useRoomStore.getState().peerId
+    if (self && useRoomStore.getState().players[self]) {
+      useRoomStore.getState().setConnectionStatus('connected')
+    }
+  }, [])
+
   const handleData = useCallback((msg: DataMessage, _from: string) => {
     if (msg.type === 'STATE') {
       useRoomStore.getState().applyState(msg.payload)
+      markSynced()
       return
     }
 
@@ -44,7 +52,37 @@ export function useRoom(
         peerManager.broadcast({ type: 'STATE', payload: next })
       }
     }
-  }, [])
+  }, [markSynced])
+
+  const waitForRoomSync = useCallback(
+    (aborted: () => boolean, timeoutMs = 25000) =>
+      new Promise<void>((resolve, reject) => {
+        const start = Date.now()
+        const tick = () => {
+          if (aborted()) {
+            resolve()
+            return
+          }
+          const self = useRoomStore.getState().peerId
+          if (self && useRoomStore.getState().players[self]) {
+            useRoomStore.getState().setConnectionStatus('connected')
+            resolve()
+            return
+          }
+          if (Date.now() - start > timeoutMs) {
+            reject(
+              new Error(
+                'Хост не ответил. Убедитесь, что комната создана и вкладка хоста открыта.',
+              ),
+            )
+            return
+          }
+          setTimeout(tick, 100)
+        }
+        tick()
+      }),
+    [],
+  )
 
   const sendAction = useCallback((action: ClientAction) => {
     const { hostId, peerId: self } = useRoomStore.getState()
@@ -107,9 +145,9 @@ export function useRoom(
     async (aborted: () => boolean) => {
       await peerManager.startAsGuest(roomId, peerId, name)
       if (aborted() || !mounted.current) return
-      useRoomStore.getState().setConnectionStatus('connected')
+      await waitForRoomSync(aborted)
     },
-    [roomId, peerId, name],
+    [roomId, peerId, name, waitForRoomSync],
   )
 
   const join = useCallback(async (aborted: () => boolean) => {
@@ -132,8 +170,8 @@ export function useRoom(
           hasVoted: false,
           connected: true,
         })
-        broadcastState()
       },
+      onRequestState: () => useRoomStore.getState().getSnapshot(),
       onGuestLeft: (guestId) => {
         useRoomStore.getState().removePlayer(guestId)
       },

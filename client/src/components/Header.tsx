@@ -1,13 +1,26 @@
+import { useState } from 'react'
+import { copyText, getShareableRoomUrl } from '../lib/copyText'
+
 interface Props {
   roomId: string
   isHost: boolean
 }
 
 export function Header({ roomId, isHost }: Props) {
-  const url = window.location.href
+  const [copyHint, setCopyHint] = useState<string | null>(null)
 
   const copyLink = async () => {
-    await navigator.clipboard.writeText(url)
+    const url = getShareableRoomUrl()
+    const ok = await copyText(url)
+
+    if (ok) {
+      setCopyHint('Ссылка скопирована')
+    } else {
+      setCopyHint('Не удалось — скопируйте из адресной строки')
+      window.prompt('Ссылка для гостей:', url)
+    }
+
+    setTimeout(() => setCopyHint(null), 2500)
   }
 
   return (
@@ -22,6 +35,9 @@ export function Header({ roomId, isHost }: Props) {
             </span>
           )}
         </p>
+        {copyHint && (
+          <p className="mt-1 text-xs text-emerald-400">{copyHint}</p>
+        )}
       </div>
       <button
         type="button"

@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { AverageDisplay } from '../components/AverageDisplay'
 import { CardDeck } from '../components/CardDeck'
 import { ErrorBanner } from '../components/ErrorBanner'
+import { JoinNameForm } from '../components/JoinNameForm'
 import { Header } from '../components/Header'
 import { LoadingState } from '../components/LoadingState'
 import { PlayerList } from '../components/PlayerList'
@@ -31,14 +32,7 @@ export function RoomPage() {
   }
 
   if (!name) {
-    return (
-      <main className="mx-auto max-w-lg px-4 py-20 text-center">
-        <p className="text-zinc-400">Укажите имя на главной странице</p>
-        <Link to="/" className="mt-4 inline-block text-violet-400 hover:underline">
-          На главную
-        </Link>
-      </main>
-    )
+    return <JoinNameForm roomId={roomId} />
   }
 
   const asCreator = searchParams.get('create') === '1'
@@ -77,7 +71,9 @@ function RoomContent({
       ? 'Подключение…'
       : room.connectionStatus === 'reconnecting'
         ? 'Переподключение…'
-        : undefined
+        : !myPlayer
+          ? 'Синхронизация с хостом…'
+          : undefined
 
   if (
     room.connectionStatus === 'connecting' ||

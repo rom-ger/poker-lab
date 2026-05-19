@@ -37,3 +37,9 @@ export type ClientAction =
 export type DataMessage =
   | { type: 'STATE'; payload: RoomState }
   | { type: 'ACTION'; payload: ClientAction; from: string }
+
+/** Служебные сообщения поверх PeerJS (не путать с DataMessage) */
+export type WireMessage =
+  | DataMessage
+  | { type: 'HELLO'; peerId: string; name: string }
+  | { type: 'REQUEST_STATE'; peerId: string }
