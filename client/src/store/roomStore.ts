@@ -37,6 +37,11 @@ interface RoomStore {
   reset: () => void
 }
 
+function allPlayersVoted(players: Record<string, Player>): boolean {
+  const list = Object.values(players)
+  return list.length > 0 && list.every((p) => p.hasVoted)
+}
+
 const initial = {
   roomId: null,
   peerId: null,
@@ -106,6 +111,9 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
           ...players,
           [from]: { ...p, vote: action.vote, hasVoted: true },
         }
+        if (allPlayersVoted(players)) {
+          phase = 'revealed'
+        }
         break
       }
       case 'REVEAL':
@@ -127,6 +135,17 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         players = {
           ...players,
           [from]: { ...p, name: action.name.trim() || p.name },
+        }
+        break
+      }
+      case 'REMOVE_PLAYER': {
+        if (from !== s.hostId || action.targetId === from) return null
+        if (!players[action.targetId]) return null
+        const next = { ...players }
+        delete next[action.targetId]
+        players = next
+        if (phase === 'voting' && allPlayersVoted(players)) {
+          phase = 'revealed'
         }
         break
       }

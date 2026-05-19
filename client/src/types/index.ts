@@ -33,6 +33,7 @@ export type ClientAction =
   | { type: 'REVEAL' }
   | { type: 'RESET' }
   | { type: 'SET_NAME'; name: string }
+  | { type: 'REMOVE_PLAYER'; targetId: string }
 
 export type DataMessage =
   | { type: 'STATE'; payload: RoomState }

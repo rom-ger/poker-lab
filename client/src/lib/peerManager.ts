@@ -318,6 +318,14 @@ export class PeerManager {
     }
   }
 
+  closePeer(peerId: string) {
+    const conn = this.connections.get(peerId)
+    if (conn) {
+      conn.close()
+      this.connections.delete(peerId)
+    }
+  }
+
   private destroyInternal(bumpGeneration: boolean) {
     this.clearConnectTimeout()
     this.clearStatePoll()

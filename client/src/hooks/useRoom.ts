@@ -36,9 +36,27 @@ export function useRoom(
     }
   }, [])
 
+  const handleKicked = useCallback(() => {
+    if (!mounted.current || isHostRef.current) return
+    peerManager.destroy()
+    useRoomStore.getState().setError('Вас удалили из комнаты')
+    useRoomStore.getState().setConnectionStatus('error')
+  }, [])
+
   const handleData = useCallback((msg: DataMessage, _from: string) => {
     if (msg.type === 'STATE') {
+      const self = useRoomStore.getState().peerId
+      const wasInRoom = self && !!useRoomStore.getState().players[self]
       useRoomStore.getState().applyState(msg.payload)
+      if (
+        wasInRoom &&
+        self &&
+        !msg.payload.players[self] &&
+        self !== msg.payload.hostId
+      ) {
+        handleKicked()
+        return
+      }
       markSynced()
       return
     }
@@ -52,7 +70,7 @@ export function useRoom(
         peerManager.broadcast({ type: 'STATE', payload: next })
       }
     }
-  }, [markSynced])
+  }, [markSynced, handleKicked])
 
   const waitForRoomSync = useCallback(
     (aborted: () => boolean, timeoutMs = 25000) =>
@@ -269,6 +287,11 @@ export function useRoom(
     vote: (vote: ClientAction & { type: 'VOTE' }) => sendAction(vote),
     reveal: () => sendAction({ type: 'REVEAL' }),
     reset: () => sendAction({ type: 'RESET' }),
+    removePlayer: (targetId: string) => {
+      if (!isHost() || targetId === useRoomStore.getState().peerId) return
+      peerManager.closePeer(targetId)
+      sendAction({ type: 'REMOVE_PLAYER', targetId })
+    },
     scheduleReconnect,
   }
 }

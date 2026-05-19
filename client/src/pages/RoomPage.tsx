@@ -115,7 +115,13 @@ function RoomContent({
         <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-zinc-500">
           Участники
         </h2>
-        <PlayerList players={players} phase={room.phase} myId={peerId} />
+        <PlayerList
+          players={players}
+          phase={room.phase}
+          myId={peerId}
+          isHost={room.isHost}
+          onRemove={room.isHost ? room.removePlayer : undefined}
+        />
       </section>
 
       {room.phase === 'revealed' && (

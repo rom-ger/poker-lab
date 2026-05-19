@@ -4,6 +4,8 @@ interface Props {
   players: Player[]
   phase: VotePhase
   myId: string
+  isHost?: boolean
+  onRemove?: (playerId: string) => void
 }
 
 function displayVote(vote: CardValue | null, phase: VotePhase): string {
@@ -13,7 +15,13 @@ function displayVote(vote: CardValue | null, phase: VotePhase): string {
   return vote != null ? String(vote) : '—'
 }
 
-export function PlayerList({ players, phase, myId }: Props) {
+export function PlayerList({
+  players,
+  phase,
+  myId,
+  isHost = false,
+  onRemove,
+}: Props) {
   if (players.length === 0) {
     return (
       <p className="text-center text-sm text-zinc-500">Пока никого нет в комнате</p>
@@ -25,17 +33,18 @@ export function PlayerList({ players, phase, myId }: Props) {
       {players.map((p) => {
         const voted = p.hasVoted
         const showVote = phase === 'revealed' || p.id === myId
+        const canRemove = isHost && p.id !== myId && onRemove
 
         return (
           <li
             key={p.id}
             className={[
-              'flex items-center justify-between rounded-xl border px-4 py-3 transition',
+              'flex items-center gap-2 rounded-xl border px-4 py-3 transition',
               p.id === myId ? 'border-violet-500/50 bg-violet-500/5' : 'border-zinc-800 bg-zinc-900/50',
               !p.connected && 'opacity-50',
             ].join(' ')}
           >
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="truncate font-medium">
                 {p.name}
                 {p.id === myId && (
@@ -60,6 +69,16 @@ export function PlayerList({ players, phase, myId }: Props) {
             >
               {showVote ? displayVote(p.vote, phase) : voted ? '✓' : '·'}
             </div>
+            {canRemove && (
+              <button
+                type="button"
+                onClick={() => onRemove(p.id)}
+                title="Удалить из комнаты"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-zinc-700 text-zinc-400 transition hover:border-red-500/50 hover:bg-red-500/10 hover:text-red-300"
+              >
+                ×
+              </button>
+            )}
           </li>
         )
       })}
