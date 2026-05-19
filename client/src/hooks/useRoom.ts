@@ -1,50 +1,50 @@
 import { useCallback, useEffect, useRef } from 'react'
-import { webrtcManager } from '../lib/webrtc'
+import { STORAGE_HOST_ROOM_KEY } from '../lib/constants'
+import { peerManager } from '../lib/peerManager'
 import { createInitialState, useRoomStore } from '../store/roomStore'
-import type { ClientAction, DataMessage, SignalingMessage } from '../types'
-import { useSignaling } from './useSignaling'
+import type { ClientAction, DataMessage } from '../types'
 
-export function useRoom(roomId: string, peerId: string, name: string) {
+function hostBackoff(peerId: string): number {
+  let h = 0
+  for (let i = 0; i < peerId.length; i++) h = (h + peerId.charCodeAt(i)) % 5000
+  return 1500 + h
+}
+
+export function useRoom(
+  roomId: string,
+  peerId: string,
+  name: string,
+  asCreator: boolean,
+) {
   const store = useRoomStore()
-  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const mounted = useRef(true)
+  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isHostRef = useRef(false)
 
   const isHost = () => useRoomStore.getState().peerId === useRoomStore.getState().hostId
 
   const broadcastState = useCallback(() => {
     const snapshot = useRoomStore.getState().getSnapshot()
     if (!snapshot || !isHost()) return
-    const msg: DataMessage = { type: 'STATE', payload: snapshot }
-    webrtcManager.broadcastToAll(msg)
+    peerManager.broadcast({ type: 'STATE', payload: snapshot })
   }, [])
 
-  const handleData = useCallback(
-    (msg: DataMessage, fromPeerId: string) => {
-      if (msg.type === 'STATE') {
-        useRoomStore.getState().applyState(msg.payload)
-        return
-      }
+  const handleData = useCallback((msg: DataMessage, _from: string) => {
+    if (msg.type === 'STATE') {
+      useRoomStore.getState().applyState(msg.payload)
+      return
+    }
 
-      if (msg.type === 'ACTION' && isHost()) {
-        const next = useRoomStore.getState().applyActionAsHost(
-          msg.payload,
-          msg.from,
-        )
-        if (next) {
-          webrtcManager.broadcastToAll({ type: 'STATE', payload: next })
-        }
-        return
+    if (msg.type === 'ACTION' && isHost()) {
+      const next = useRoomStore.getState().applyActionAsHost(
+        msg.payload,
+        msg.from,
+      )
+      if (next) {
+        peerManager.broadcast({ type: 'STATE', payload: next })
       }
-
-      if (msg.type === 'ACTION' && !isHost()) {
-        /* client sent to host only — should not receive */
-        void fromPeerId
-      }
-    },
-    [],
-  )
-
-  const scheduleReconnectRef = useRef<() => void>(() => {})
+    }
+  }, [])
 
   const sendAction = useCallback((action: ClientAction) => {
     const { hostId, peerId: self } = useRoomStore.getState()
@@ -53,10 +53,10 @@ export function useRoom(roomId: string, peerId: string, name: string) {
     if (isHost()) {
       const next = useRoomStore.getState().applyActionAsHost(action, self)
       if (next) {
-        webrtcManager.broadcastToAll({ type: 'STATE', payload: next })
+        peerManager.broadcast({ type: 'STATE', payload: next })
       }
     } else {
-      webrtcManager.send(hostId, {
+      peerManager.sendToHost({
         type: 'ACTION',
         payload: action,
         from: self,
@@ -64,154 +64,153 @@ export function useRoom(roomId: string, peerId: string, name: string) {
     }
   }, [])
 
-  const handleSignaling = useCallback(
-    async (msg: SignalingMessage) => {
-      switch (msg.type) {
-        case 'signal-disconnected': {
-          scheduleReconnectRef.current()
-          break
-        }
+  const setupAsHost = useCallback(() => {
+    isHostRef.current = true
+    sessionStorage.setItem(STORAGE_HOST_ROOM_KEY, `${roomId}:${peerId}`)
+    useRoomStore.getState().setHostId(peerId)
 
-        case 'joined': {
-          useRoomStore.getState().setHostId(msg.hostId)
-          const host = msg.hostId === peerId
+    const existing = useRoomStore.getState().getSnapshot()
+    if (existing && Object.keys(existing.players).length > 0) {
+      existing.hostId = peerId
+      existing.players[peerId] = {
+        id: peerId,
+        name,
+        vote: existing.players[peerId]?.vote ?? null,
+        hasVoted: existing.players[peerId]?.hasVoted ?? false,
+        connected: true,
+      }
+      useRoomStore.getState().applyState(existing)
+    } else {
+      useRoomStore.getState().applyState(
+        createInitialState(roomId, peerId, peerId, name),
+      )
+    }
+  }, [roomId, peerId, name])
 
-          webrtcManager.configure({
-            roomId,
-            selfId: peerId,
-            isHost: host,
-            onData: handleData,
-            onPeerConnected: () => broadcastState(),
-            sendSignal: signaling.send,
-          })
-
-          if (host) {
-            const initial = createInitialState(roomId, peerId, peerId, name)
-            useRoomStore.getState().applyState(initial)
-            for (const p of msg.peers) {
-              useRoomStore.getState().addPlayer({
-                id: p.peerId,
-                name: p.name,
-                vote: null,
-                hasVoted: false,
-                connected: false,
-              })
-              await webrtcManager.connectAsHost(p.peerId)
-            }
-          }
-
-          useRoomStore.getState().setConnectionStatus('connected')
-          break
-        }
-
-        case 'peer-joined': {
-          if (isHost()) {
-            useRoomStore.getState().addPlayer({
-              id: msg.peerId,
-              name: msg.name,
-              vote: null,
-              hasVoted: false,
-              connected: false,
-            })
-            await webrtcManager.connectAsHost(msg.peerId)
-            broadcastState()
-          }
-          break
-        }
-
-        case 'peer-left': {
-          webrtcManager.closePeer(msg.peerId)
-          useRoomStore.getState().removePlayer(msg.peerId)
-          break
-        }
-
-        case 'host-changed': {
-          const wasHost = isHost()
-          useRoomStore.getState().setHostId(msg.hostId)
-          const nowHost = msg.hostId === peerId
-          webrtcManager.setHost(nowHost)
-          webrtcManager.closeAll()
-
-          if (nowHost) {
-            const snapshot = useRoomStore.getState().getSnapshot()
-            if (snapshot) {
-              snapshot.hostId = peerId
-              useRoomStore.getState().applyState(snapshot)
-            }
-            const players = useRoomStore.getState().players
-            for (const id of Object.keys(players)) {
-              if (id !== peerId) {
-                await webrtcManager.connectAsHost(id)
-              }
-            }
-            broadcastState()
-          } else if (wasHost) {
-            /* became guest — wait for offers from new host */
-          }
-          break
-        }
-
-        case 'offer':
-          if (msg.to === peerId) {
-            await webrtcManager.handleOffer(msg.from, msg.sdp)
-            if (isHost()) broadcastState()
-          }
-          break
-
-        case 'answer':
-          if (msg.to === peerId) {
-            await webrtcManager.handleAnswer(msg.from, msg.sdp)
-          }
-          break
-
-        case 'ice':
-          if (msg.to === peerId) {
-            await webrtcManager.handleIce(msg.from, msg.candidate)
-          }
-          break
+  const tryClaimHost = useCallback(
+    async (aborted: () => boolean): Promise<boolean> => {
+      try {
+        await peerManager.startAsHost(roomId)
+        if (aborted() || !mounted.current) return false
+        setupAsHost()
+        broadcastState()
+        useRoomStore.getState().setConnectionStatus('connected')
+        return true
+      } catch {
+        return false
       }
     },
-    [roomId, peerId, name, handleData, broadcastState],
+    [roomId, setupAsHost, broadcastState],
   )
 
-  const signaling = useSignaling(handleSignaling)
+  const connectAsGuest = useCallback(
+    async (aborted: () => boolean) => {
+      await peerManager.startAsGuest(roomId, peerId, name)
+      if (aborted() || !mounted.current) return
+      useRoomStore.getState().setConnectionStatus('connected')
+    },
+    [roomId, peerId, name],
+  )
 
-  const join = useCallback(async () => {
+  const join = useCallback(async (aborted: () => boolean) => {
     useRoomStore.getState().setConnectionStatus('connecting')
     useRoomStore.getState().setError(null)
-    useRoomStore.getState().setMeta({ roomId, peerId, hostId: peerId, myName: name })
+    useRoomStore.getState().setMeta({
+      roomId,
+      peerId,
+      hostId: peerId,
+      myName: name,
+    })
+
+    peerManager.configure({
+      onData: handleData,
+      onGuestJoined: (guestId, guestName) => {
+        useRoomStore.getState().addPlayer({
+          id: guestId,
+          name: guestName,
+          vote: null,
+          hasVoted: false,
+          connected: true,
+        })
+        broadcastState()
+      },
+      onGuestLeft: (guestId) => {
+        useRoomStore.getState().removePlayer(guestId)
+      },
+      onHostLost: () => {
+        if (!mounted.current || isHostRef.current) return
+        scheduleReconnectRef.current()
+      },
+    })
+
+    const savedHost = sessionStorage.getItem(STORAGE_HOST_ROOM_KEY)
+    const wasHostThisRoom = savedHost === `${roomId}:${peerId}`
+    const shouldTryHost = asCreator || wasHostThisRoom
 
     try {
-      await signaling.connect(roomId, peerId, name)
+      if (shouldTryHost) {
+        const ok = await tryClaimHost(aborted)
+        if (aborted()) return
+        if (ok) return
+      }
+      await connectAsGuest(aborted)
+      if (aborted()) return
     } catch (e) {
+      if (aborted()) return
       useRoomStore
         .getState()
         .setError(e instanceof Error ? e.message : 'Ошибка подключения')
       useRoomStore.getState().setConnectionStatus('error')
     }
-  }, [roomId, peerId, name, signaling])
+  }, [
+    roomId,
+    peerId,
+    name,
+    asCreator,
+    handleData,
+    broadcastState,
+    tryClaimHost,
+    connectAsGuest,
+  ])
+
+  const scheduleReconnectRef = useRef<() => void>(() => {})
 
   const scheduleReconnect = useCallback(() => {
     if (!mounted.current) return
     useRoomStore.getState().setConnectionStatus('reconnecting')
     if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
-    reconnectTimer.current = setTimeout(() => {
-      webrtcManager.closeAll()
-      void join()
-    }, 2000)
-  }, [join])
+
+    reconnectTimer.current = setTimeout(async () => {
+      peerManager.destroy()
+      isHostRef.current = false
+
+      try {
+        await connectAsGuest(() => false)
+      } catch {
+        const claimed = await tryClaimHost(() => false)
+        if (!claimed && mounted.current) {
+          useRoomStore.getState().setError('Хост недоступен. Попробуйте обновить страницу.')
+          useRoomStore.getState().setConnectionStatus('error')
+        }
+      }
+    }, hostBackoff(peerId))
+  }, [peerId, connectAsGuest, tryClaimHost])
 
   scheduleReconnectRef.current = scheduleReconnect
 
   useEffect(() => {
     mounted.current = true
-    void join()
+    let cancelled = false
+    const aborted = () => cancelled || !mounted.current
+
+    void join(aborted)
 
     return () => {
+      cancelled = true
       mounted.current = false
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
-      signaling.disconnect()
-      webrtcManager.closeAll()
+      peerManager.destroy()
+      isHostRef.current = false
       useRoomStore.getState().reset()
     }
   }, [roomId, peerId]) // eslint-disable-line react-hooks/exhaustive-deps

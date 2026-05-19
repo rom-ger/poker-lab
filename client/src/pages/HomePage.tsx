@@ -9,7 +9,7 @@ export function HomePage() {
   const [joinId, setJoinId] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  const goToRoom = (roomId: string) => {
+  const goToRoom = (roomId: string, isCreator = false) => {
     const trimmed = name.trim()
     if (!trimmed) {
       setError('Введите имя')
@@ -17,10 +17,11 @@ export function HomePage() {
     }
     setStoredName(trimmed)
     setError(null)
-    navigate(`/room/${roomId}?name=${encodeURIComponent(trimmed)}`)
+    const create = isCreator ? '&create=1' : ''
+    navigate(`/room/${roomId}?name=${encodeURIComponent(trimmed)}${create}`)
   }
 
-  const createRoom = () => goToRoom(generateRoomId())
+  const createRoom = () => goToRoom(generateRoomId(), true)
 
   const joinRoom = () => {
     const id = joinId.trim().toLowerCase()
@@ -36,7 +37,10 @@ export function HomePage() {
       <div className="text-center">
         <h1 className="text-3xl font-bold tracking-tight">Planning Poker</h1>
         <p className="mt-2 text-zinc-400">
-          Peer-to-peer оценка задач без сервера состояния
+          P2P через WebRTC · signaling на PeerJS Cloud
+        </p>
+        <p className="mt-1 text-xs text-zinc-600">
+          Деплой — только статика, без своего сервера
         </p>
       </div>
 

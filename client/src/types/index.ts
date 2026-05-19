@@ -37,37 +37,3 @@ export type ClientAction =
 export type DataMessage =
   | { type: 'STATE'; payload: RoomState }
   | { type: 'ACTION'; payload: ClientAction; from: string }
-
-export type SignalingMessage =
-  | { type: 'signal-disconnected' }
-  | { type: 'join'; roomId: string; peerId: string; name: string }
-  | {
-      type: 'joined'
-      peerId: string
-      hostId: string
-      peers: Array<{ peerId: string; name: string }>
-    }
-  | { type: 'peer-joined'; peerId: string; name: string }
-  | { type: 'peer-left'; peerId: string }
-  | { type: 'host-changed'; hostId: string }
-  | {
-      type: 'offer'
-      roomId: string
-      from: string
-      to: string
-      sdp: RTCSessionDescriptionInit
-    }
-  | {
-      type: 'answer'
-      roomId: string
-      from: string
-      to: string
-      sdp: RTCSessionDescriptionInit
-    }
-  | {
-      type: 'ice'
-      roomId: string
-      from: string
-      to: string
-      candidate: RTCIceCandidateInit
-    }

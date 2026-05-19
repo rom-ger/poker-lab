@@ -41,19 +41,30 @@ export function RoomPage() {
     )
   }
 
-  return <RoomContent roomId={roomId} peerId={peerId} name={name} />
+  const asCreator = searchParams.get('create') === '1'
+
+  return (
+    <RoomContent
+      roomId={roomId}
+      peerId={peerId}
+      name={name}
+      asCreator={asCreator}
+    />
+  )
 }
 
 function RoomContent({
   roomId,
   peerId,
   name,
+  asCreator,
 }: {
   roomId: string
   peerId: string
   name: string
+  asCreator: boolean
 }) {
-  const room = useRoom(roomId, peerId, name)
+  const room = useRoom(roomId, peerId, name, asCreator)
   const players = Object.values(room.players).sort((a, b) =>
     a.name.localeCompare(b.name),
   )
@@ -99,7 +110,9 @@ function RoomContent({
       <Header roomId={roomId} isHost={room.isHost} />
 
       {room.connectionStatus === 'connected' && (
-        <p className="mt-2 text-xs text-emerald-500/80">● подключено (P2P)</p>
+        <p className="mt-2 text-xs text-emerald-500/80">
+          ● P2P · signaling: PeerJS Cloud
+        </p>
       )}
 
       <section className="mt-8">

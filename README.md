@@ -1,118 +1,67 @@
-# Planning Poker (P2P)
+# Planning Poker (P2P + PeerJS Cloud)
 
-MVP Planning Poker без backend-состояния и БД. Синхронизация комнаты — **peer-to-peer** через WebRTC Data Channels. Signaling-сервер только помогает установить соединение (SDP/ICE).
+MVP Planning Poker: состояние комнаты только в браузерах, синхронизация по WebRTC Data Channels. **Signaling — PeerJS Cloud** (`0.peerjs.com`), свой сервер не нужен.
 
-## Архитектура WebRTC
-
-```
-┌─────────┐     WebSocket (SDP/ICE)      ┌──────────────┐
-│ Browser │ ◄──────────────────────────► │  Signaling   │
-│   (A)   │         без state            │   (~50 LOC)  │
-└────┬────┘                              └──────────────┘
-     │ Data Channel (JSON)
-     │  STATE / ACTION
-     ▼
-┌─────────┐
-│ Browser │
-│   (B)   │
-└─────────┘
-```
-
-**Топология «звезда»:** один участник — **host**. Host хранит каноническое состояние (Zustand) и рассылает `STATE` всем гостям. Гости отправляют `ACTION` только host'у.
-
-**Почему так:** проще, чем mesh; достаточно для MVP; легко делать reveal/reset с одной точки правды.
-
-**Поток данных:**
-1. Пользователь голосует → `ACTION { VOTE }` → host применяет → `STATE` broadcast.
-2. Host нажимает Reveal → `phase: revealed` → все видят карты.
-3. Reset → обнуляет голоса, `phase: voting`.
-
-**Host migration:** signaling при `disconnect` выбирает нового host (минимальный `peerId`). У всех уже есть копия state из последнего `STATE` — новый host пересоздаёт WebRTC-офферы.
-
-## Signaling
-
-Сервер (`server/index.js`) — **только relay**:
-- `join` — вход в комнату, список peers, `hostId`
-- `offer` / `answer` / `ice` — проброс между `from` и `to`
-- `peer-joined` / `peer-left` / `host-changed` — уведомления
-
-Никакого хранения голосов, фаз, имён на сервере.
-
-## Структура проекта
+## Архитектура
 
 ```
-poker-lab/
-├── client/                 # React + Vite + Tailwind + Zustand
-│   └── src/
-│       ├── components/     # UI
-│       ├── hooks/          # useRoom, useSignaling
-│       ├── lib/            # WebRTC, roomId, storage
-│       ├── pages/          # Home, Room
-│       ├── store/          # Zustand
-│       └── types/
-├── server/                 # ws signaling relay
-├── package.json            # npm workspaces
-└── README.md
+Статика (Vite build)  ──HTTPS──►  GitHub Pages / Netlify / …
+                                        │
+                         wss://0.peerjs.com (только SDP/ICE)
+                                        │
+Browser A ◄══════ WebRTC Data Channel (STATE / ACTION) ══════► Browser B
 ```
+
+- **Host** регистрирует Peer ID `poker-{roomId}` на PeerJS Cloud.
+- **Гости** подключаются к этому ID (`peer.connect`).
+- Голоса и фазы идут **напрямую** между браузерами после handshake.
 
 ## Локальный запуск
 
 ```bash
-# из корня репозитория
-npm install
-cd server && npm install && cd ..
-
-# терминал 1 — signaling
-npm run dev -w server
-
-# терминал 2 — frontend
-npm run dev -w client
-```
-
-Или одной командой (нужен `concurrently` из корня):
-
-```bash
+cd client
 npm install
 npm run dev
 ```
 
-- Frontend: http://localhost:5173
-- Signaling: ws://localhost:3001
+Откройте http://localhost:5173 — signaling сразу идёт на PeerJS Cloud (интернет обязателен).
 
-Скопируйте `client/.env.example` → `client/.env` при необходимости.
+## Деплой (только статика)
 
-## Деплой
-
-| Часть | Куда | Как |
-|-------|------|-----|
-| **client** | Vercel / Netlify / Cloudflare Pages | `npm run build -w client`, publish `client/dist` |
-| **signaling** | Railway / Fly.io / Render | `npm run start -w server`, `PORT` env |
-
-На production задайте:
-
-```
-VITE_SIGNALING_URL=wss://your-signaling.example.com
+```bash
+cd client
+npm run build
+# залить содержимое client/dist на любой static hosting
 ```
 
-**Важно:** signaling должен быть **WSS** (HTTPS-сайт + `wss://`).
+Примеры: GitHub Pages, Cloudflare Pages, Netlify, S3 + CloudFront.
+
+**Переменные окружения не обязательны** — по умолчанию `0.peerjs.com`.
+
+Опционально в `.env.production`:
+
+```
+VITE_PEERJS_HOST=0.peerjs.com
+VITE_PEERJS_PORT=443
+VITE_PEERJS_SECURE=true
+```
+
+## Как пользоваться
+
+1. **Создать комнату** — вы становитесь host, в URL будет `?create=1`.
+2. **Скопировать ссылку** без `create=1` для коллег (или целиком — гость подключится к host).
+3. Голосуйте → host жмёт «Показать голоса» → «Новый раунд».
+
+## Host migration (best-effort)
+
+Если host закрыл вкладку, гости ждут и пробуют переподключиться. Один из участников может занять `poker-{roomId}` (с задержкой по `peerId`) и продолжить с последним известным state.
 
 ## Ограничения
 
-- Нужен публичный signaling + STUN; за жёстким NAT может понадобиться TURN (платный).
-- Host — единая точка рассылки; при падении host — краткий разрыв до migration.
-- Нет персистентности: закрыли все вкладки — комната исчезла.
-- Reconnect MVP-уровня (повторный join через 2с).
-- Нет end-to-end шифрования application-level (только DTLS в WebRTC).
-
-## Идеи на будущее
-
-- TURN-сервер для корпоративных сетей
-- Mesh или CRDT для равноправных peer'ов
-- История раундов, экспорт
-- Аватарки, emoji-реакции
-- Password на комнату (shared secret в URL hash)
-- Observability (кто host, RTT)
+- Зависимость от **PeerJS Cloud** (бесплатный, без SLA).
+- За строгим NAT может понадобиться **TURN** (не настроен).
+- Публичный Peer ID комнаты `poker-{roomId}` — любой, кто знает ID, может попытаться войти.
 
 ## Стек
 
-React · TypeScript · Vite 5 · Tailwind CSS 4 · WebRTC Data Channels · Zustand · ws (signaling)
+React · TypeScript · Vite · Tailwind · Zustand · PeerJS · WebRTC

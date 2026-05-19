@@ -2,15 +2,11 @@
   "name": "poker-lab",
   "private": true,
   "scripts": {
-    "dev": "concurrently -n client,signal -c cyan,magenta \"npm run dev -w client\" \"npm run dev -w server\"",
+    "dev": "npm run dev -w client",
     "build": "npm run build -w client",
-    "start": "npm run start -w server"
+    "preview": "npm run preview -w client"
   },
   "workspaces": [
-    "client",
-    "server"
-  ],
-  "devDependencies": {
-    "concurrently": "^9.1.2"
-  }
+    "client"
+  ]
 }
