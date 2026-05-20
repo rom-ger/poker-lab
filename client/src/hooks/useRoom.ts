@@ -78,7 +78,7 @@ export function useRoom(
         const start = Date.now()
         const tick = () => {
           if (aborted()) {
-            resolve()
+            reject(new Error('cancelled'))
             return
           }
           const self = useRoomStore.getState().peerId
@@ -137,6 +137,13 @@ export function useRoom(
       }
       useRoomStore.getState().applyState(existing)
     } else {
+      useRoomStore.getState().applyState(
+        createInitialState(roomId, peerId, peerId, name),
+      )
+    }
+
+    const self = useRoomStore.getState().players[peerId]
+    if (!self) {
       useRoomStore.getState().applyState(
         createInitialState(roomId, peerId, peerId, name),
       )
@@ -221,7 +228,7 @@ export function useRoom(
       await connectAsGuest(aborted)
       if (aborted()) return
     } catch (e) {
-      if (aborted()) return
+      if (aborted() || (e instanceof Error && e.message === 'cancelled')) return
       useRoomStore
         .getState()
         .setError(e instanceof Error ? e.message : 'Ошибка подключения')

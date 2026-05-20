@@ -13,9 +13,11 @@ function label(value: CardValue): string {
 
 export function CardDeck({ selected, disabled, onSelect }: Props) {
   return (
-    <div className="grid grid-cols-4 gap-2 sm:grid-cols-7 sm:gap-3">
+    <div className="grid grid-cols-4 gap-2 sm:grid-cols-7 sm:gap-1.5 lg:grid-cols-[repeat(14,minmax(0,1fr))] lg:gap-1">
       {CARD_VALUES.map((value) => {
         const isSelected = selected === value
+        const isSpecial = value === 'coffee' || value === '?'
+
         return (
           <button
             key={String(value)}
@@ -23,15 +25,15 @@ export function CardDeck({ selected, disabled, onSelect }: Props) {
             disabled={disabled}
             onClick={() => onSelect(value)}
             className={[
-              'group relative flex aspect-[2/3] items-center justify-center rounded-xl border text-lg font-semibold transition-all duration-200',
-              'hover:-translate-y-1 hover:shadow-lg hover:shadow-violet-500/20 active:scale-95',
-              disabled && 'pointer-events-none opacity-40',
+              'flex h-12 items-center justify-center rounded-lg border font-semibold transition sm:h-10 sm:rounded-md',
+              isSpecial ? 'text-base sm:text-sm' : 'text-sm sm:text-xs',
+              disabled && 'pointer-events-none opacity-35',
               isSelected
-                ? 'border-violet-400 bg-violet-600/30 shadow-lg shadow-violet-500/30 scale-105'
-                : 'border-zinc-700 bg-zinc-900/80 hover:border-violet-500/60',
+                ? 'border-indigo-500 bg-indigo-50 text-indigo-700 ring-1 ring-indigo-500'
+                : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-300 hover:bg-indigo-50/50 active:bg-indigo-50',
             ].join(' ')}
           >
-            <span className="transition group-hover:scale-110">{label(value)}</span>
+            {label(value)}
           </button>
         )
       })}

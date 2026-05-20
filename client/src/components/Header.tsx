@@ -1,51 +1,58 @@
+import type { ReactNode } from 'react'
 import { useState } from 'react'
 import { copyText, getShareableRoomUrl } from '../lib/copyText'
 
 interface Props {
   roomId: string
   isHost: boolean
+  actions?: ReactNode
 }
 
-export function Header({ roomId, isHost }: Props) {
-  const [copyHint, setCopyHint] = useState<string | null>(null)
+export function Header({ roomId, isHost, actions }: Props) {
+  const [copyHint, setCopyHint] = useState(false)
 
   const copyLink = async () => {
     const url = getShareableRoomUrl()
     const ok = await copyText(url)
 
     if (ok) {
-      setCopyHint('Ссылка скопирована')
+      setCopyHint(true)
+      setTimeout(() => setCopyHint(false), 2000)
     } else {
-      setCopyHint('Не удалось — скопируйте из адресной строки')
       window.prompt('Ссылка для гостей:', url)
     }
-
-    setTimeout(() => setCopyHint(null), 2500)
   }
 
   return (
-    <header className="flex flex-col gap-3 border-b border-zinc-800 pb-4 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Planning Poker</h1>
-        <p className="mt-1 text-sm text-zinc-400">
-          Комната <span className="font-mono text-violet-300">{roomId}</span>
-          {isHost && (
-            <span className="ml-2 rounded-full bg-violet-500/20 px-2 py-0.5 text-xs text-violet-300">
-              host
-            </span>
-          )}
-        </p>
-        {copyHint && (
-          <p className="mt-1 text-xs text-emerald-400">{copyHint}</p>
-        )}
+    <header className="sticky top-0 z-10 -mx-4 border-b border-slate-200/80 bg-slate-50/90 px-4 py-3 backdrop-blur-md">
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h1 className="font-display truncate text-base font-semibold text-slate-900">
+              Planning Poker
+            </h1>
+            {isHost && (
+              <span className="shrink-0 rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-indigo-600">
+                host
+              </span>
+            )}
+          </div>
+          <p className="truncate font-mono text-xs text-slate-400">
+            {roomId}
+            {copyHint && <span className="ml-2 text-indigo-500">скопировано</span>}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {actions}
+          <button
+            type="button"
+            onClick={copyLink}
+            className="btn-secondary !px-3 !py-1.5 text-xs"
+          >
+            Ссылка
+          </button>
+        </div>
       </div>
-      <button
-        type="button"
-        onClick={copyLink}
-        className="rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm transition hover:border-violet-500/50 hover:bg-zinc-800"
-      >
-        Скопировать ссылку
-      </button>
     </header>
   )
 }

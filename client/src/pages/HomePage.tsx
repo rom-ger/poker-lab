@@ -33,67 +33,51 @@ export function HomePage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-lg flex-col justify-center px-4 py-12">
+    <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-4 py-12">
       <div className="text-center">
-        <h1 className="text-3xl font-bold tracking-tight">Planning Poker</h1>
-        <p className="mt-2 text-zinc-400">
-          P2P через WebRTC · signaling на PeerJS Cloud
-        </p>
-        <p className="mt-1 text-xs text-zinc-600">
-          Деплой — только статика, без своего сервера
-        </p>
+        <h1 className="font-display text-2xl font-bold text-slate-900">
+          Planning Poker
+        </h1>
       </div>
 
-      <div className="mt-10 space-y-4">
-        <label className="block">
-          <span className="text-sm text-zinc-400">Ваше имя</span>
+      <div className="panel mt-8 p-5">
+        <div className="space-y-3">
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Алексей"
+            placeholder="Ваше имя"
             maxLength={32}
-            className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 outline-none transition focus:border-violet-500"
+            className="input-field"
           />
-        </label>
 
-        {error && (
-          <p className="text-sm text-red-400" role="alert">
-            {error}
-          </p>
-        )}
+          {error && (
+            <p className="text-sm text-red-500" role="alert">
+              {error}
+            </p>
+          )}
 
-        <button
-          type="button"
-          onClick={createRoom}
-          className="w-full rounded-xl bg-violet-600 py-3 font-medium transition hover:bg-violet-500"
-        >
-          Создать комнату
-        </button>
+          <button type="button" onClick={createRoom} className="btn-primary w-full">
+            Создать комнату
+          </button>
 
-        <div className="relative py-2 text-center text-xs text-zinc-600">
-          <span className="bg-zinc-950 px-2">или</span>
-          <div className="absolute inset-x-0 top-1/2 -z-10 border-t border-zinc-800" />
-        </div>
+          <div className="relative py-2 text-center text-xs text-slate-400">
+            <span className="relative z-10 bg-white px-2">или</span>
+            <div className="absolute inset-x-0 top-1/2 border-t border-slate-100" />
+          </div>
 
-        <label className="block">
-          <span className="text-sm text-zinc-400">ID комнаты</span>
           <input
             type="text"
             value={joinId}
             onChange={(e) => setJoinId(e.target.value)}
-            placeholder="abc12xyz"
-            className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 font-mono outline-none transition focus:border-violet-500"
+            placeholder="ID комнаты"
+            className="input-field font-mono"
           />
-        </label>
 
-        <button
-          type="button"
-          onClick={joinRoom}
-          className="w-full rounded-xl border border-zinc-600 bg-zinc-900 py-3 font-medium transition hover:border-violet-500/50"
-        >
-          Войти в комнату
-        </button>
+          <button type="button" onClick={joinRoom} className="btn-secondary w-full">
+            Войти
+          </button>
+        </div>
       </div>
     </main>
   )

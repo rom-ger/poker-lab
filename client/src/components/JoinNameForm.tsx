@@ -24,40 +24,35 @@ export function JoinNameForm({ roomId }: Props) {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4 py-12">
-      <h1 className="text-center text-2xl font-bold">Вход в комнату</h1>
-      <p className="mt-2 text-center text-sm text-zinc-400">
-        ID: <span className="font-mono text-violet-300">{roomId}</span>
-      </p>
+    <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-4 py-12">
+      <div className="text-center">
+        <h1 className="font-display text-2xl font-bold text-slate-900">Вход</h1>
+        <p className="mt-1 font-mono text-sm text-slate-400">{roomId}</p>
+      </div>
 
-      <div className="mt-8 space-y-4">
-        <label className="block">
-          <span className="text-sm text-zinc-400">Ваше имя</span>
+      <div className="panel mt-6 p-5">
+        <div className="space-y-3">
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && join()}
-            placeholder="Алексей"
+            placeholder="Ваше имя"
             maxLength={32}
             autoFocus
-            className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 outline-none transition focus:border-violet-500"
+            className="input-field"
           />
-        </label>
 
-        {error && (
-          <p className="text-sm text-red-400" role="alert">
-            {error}
-          </p>
-        )}
+          {error && (
+            <p className="text-sm text-red-500" role="alert">
+              {error}
+            </p>
+          )}
 
-        <button
-          type="button"
-          onClick={join}
-          className="w-full rounded-xl bg-violet-600 py-3 font-medium transition hover:bg-violet-500"
-        >
-          Войти
-        </button>
+          <button type="button" onClick={join} className="btn-primary w-full">
+            Войти
+          </button>
+        </div>
       </div>
     </main>
   )

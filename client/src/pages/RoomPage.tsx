@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { AverageDisplay } from '../components/AverageDisplay'
 import { CardDeck } from '../components/CardDeck'
@@ -23,8 +23,8 @@ export function RoomPage() {
   if (!isValidRoomId(roomId)) {
     return (
       <main className="mx-auto max-w-lg px-4 py-20 text-center">
-        <p className="text-red-400">Некорректный ID комнаты</p>
-        <Link to="/" className="mt-4 inline-block text-violet-400 hover:underline">
+        <p className="text-red-500">Некорректный ID комнаты</p>
+        <Link to="/" className="mt-4 inline-block text-indigo-600 hover:underline">
           На главную
         </Link>
       </main>
@@ -66,23 +66,34 @@ function RoomContent({
   const average =
     room.phase === 'revealed' ? calculateAverage(players) : null
 
-  const statusLabel =
-    room.connectionStatus === 'connecting'
-      ? 'Подключение…'
-      : room.connectionStatus === 'reconnecting'
-        ? 'Переподключение…'
-        : !myPlayer
-          ? 'Синхронизация с хостом…'
-          : undefined
+  const [syncTimedOut, setSyncTimedOut] = useState(false)
+
+  useEffect(() => {
+    if (myPlayer) {
+      setSyncTimedOut(false)
+      return
+    }
+    if (
+      room.connectionStatus === 'connecting' ||
+      room.connectionStatus === 'reconnecting'
+    ) {
+      return
+    }
+    const timer = setTimeout(() => setSyncTimedOut(true), 8000)
+    return () => clearTimeout(timer)
+  }, [myPlayer, room.connectionStatus])
 
   if (
     room.connectionStatus === 'connecting' ||
-    room.connectionStatus === 'reconnecting' ||
-    !myPlayer
+    room.connectionStatus === 'reconnecting'
   ) {
+    const label =
+      room.connectionStatus === 'reconnecting'
+        ? 'Переподключение…'
+        : 'Подключение…'
     return (
       <main className="mx-auto max-w-3xl px-4 py-8">
-        <LoadingState label={statusLabel} />
+        <LoadingState label={label} />
       </main>
     )
   }
@@ -94,46 +105,51 @@ function RoomContent({
           message={room.error ?? 'Ошибка подключения'}
           onRetry={room.scheduleReconnect}
         />
-        <Link to="/" className="mt-6 block text-center text-sm text-zinc-500 hover:text-zinc-300">
+        <Link to="/" className="mt-6 block text-center text-sm text-slate-400 hover:text-slate-600">
           На главную
         </Link>
       </main>
     )
   }
 
+  if (!myPlayer) {
+    if (syncTimedOut) {
+      return (
+        <main className="mx-auto max-w-3xl px-4 py-8">
+          <ErrorBanner
+            message="Не удалось войти в комнату. Проверьте, что хост онлайн, или создайте комнату заново."
+            onRetry={room.scheduleReconnect}
+          />
+          <Link to="/" className="mt-6 block text-center text-sm text-slate-400 hover:text-slate-600">
+            На главную
+          </Link>
+        </main>
+      )
+    }
+
+    return (
+      <main className="mx-auto max-w-3xl px-4 py-8">
+        <LoadingState label="Синхронизация…" />
+      </main>
+    )
+  }
+
   return (
-    <main className="mx-auto max-w-3xl px-4 py-6 pb-12">
-      <Header roomId={roomId} isHost={room.isHost} />
+    <main className="mx-auto max-w-3xl px-4 pb-8">
+      <Header
+        roomId={roomId}
+        isHost={room.isHost}
+        actions={
+          <RoomControls
+            phase={room.phase}
+            isHost={room.isHost}
+            onReveal={room.reveal}
+            onReset={room.reset}
+          />
+        }
+      />
 
-      {room.connectionStatus === 'connected' && (
-        <p className="mt-2 text-xs text-emerald-500/80">
-          ● P2P · signaling: PeerJS Cloud
-        </p>
-      )}
-
-      <section className="mt-8">
-        <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-zinc-500">
-          Участники
-        </h2>
-        <PlayerList
-          players={players}
-          phase={room.phase}
-          myId={peerId}
-          isHost={room.isHost}
-          onRemove={room.isHost ? room.removePlayer : undefined}
-        />
-      </section>
-
-      {room.phase === 'revealed' && (
-        <section className="mt-6">
-          <AverageDisplay average={average} />
-        </section>
-      )}
-
-      <section className="mt-8">
-        <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-zinc-500">
-          Ваша оценка
-        </h2>
+      <section className="panel mt-5 p-4">
         <CardDeck
           selected={myPlayer?.vote ?? null}
           disabled={room.phase !== 'voting'}
@@ -141,12 +157,19 @@ function RoomContent({
         />
       </section>
 
-      <section className="mt-8">
-        <RoomControls
+      {room.phase === 'revealed' && average != null && (
+        <div className="mt-3 flex justify-center">
+          <AverageDisplay average={average} />
+        </div>
+      )}
+
+      <section className="panel mt-4 p-3">
+        <PlayerList
+          players={players}
           phase={room.phase}
+          myId={peerId}
           isHost={room.isHost}
-          onReveal={room.reveal}
-          onReset={room.reset}
+          onRemove={room.isHost ? room.removePlayer : undefined}
         />
       </section>
     </main>

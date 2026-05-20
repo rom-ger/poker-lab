@@ -6,7 +6,7 @@ interface Props {
 export function ErrorBanner({ message, onRetry }: Props) {
   return (
     <div
-      className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200"
+      className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
       role="alert"
     >
       <p>{message}</p>
@@ -14,9 +14,9 @@ export function ErrorBanner({ message, onRetry }: Props) {
         <button
           type="button"
           onClick={onRetry}
-          className="mt-2 text-red-300 underline hover:text-red-100"
+          className="mt-2 font-medium text-red-600 underline underline-offset-2 hover:text-red-800"
         >
-          Повторить подключение
+          Повторить
         </button>
       )}
     </div>
