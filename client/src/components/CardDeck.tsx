@@ -3,7 +3,7 @@ import { CARD_VALUES, type CardValue } from '../types'
 interface Props {
   selected: CardValue | null
   disabled: boolean
-  onSelect: (value: CardValue) => void
+  onSelect: (value: CardValue | null) => void
 }
 
 function label(value: CardValue): string {
@@ -23,7 +23,7 @@ export function CardDeck({ selected, disabled, onSelect }: Props) {
             key={String(value)}
             type="button"
             disabled={disabled}
-            onClick={() => onSelect(value)}
+            onClick={() => onSelect(isSelected ? null : value)}
             className={[
               'flex h-12 items-center justify-center rounded-lg border font-semibold transition sm:h-10 sm:rounded-md',
               isSpecial ? 'text-base sm:text-sm' : 'text-sm sm:text-xs',

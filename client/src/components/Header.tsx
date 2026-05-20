@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { copyText, getShareableRoomUrl } from '../lib/copyText'
 
 interface Props {
@@ -28,8 +29,13 @@ export function Header({ roomId, isHost, actions }: Props) {
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h1 className="font-display truncate text-base font-semibold text-slate-900">
-              Planning Poker
+            <h1 className="truncate text-base font-semibold">
+              <Link
+                to="/"
+                className="font-display text-slate-900 transition hover:text-indigo-600"
+              >
+                Planning Poker
+              </Link>
             </h1>
             {isHost && (
               <span className="shrink-0 rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-indigo-600">

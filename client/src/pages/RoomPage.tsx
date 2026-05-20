@@ -12,7 +12,6 @@ import { useRoom } from '../hooks/useRoom'
 import { calculateAverage } from '../lib/average'
 import { getOrCreatePeerId } from '../lib/peerId'
 import { isValidRoomId } from '../lib/roomId'
-import type { CardValue } from '../types'
 
 export function RoomPage() {
   const { roomId = '' } = useParams()
@@ -153,7 +152,7 @@ function RoomContent({
         <CardDeck
           selected={myPlayer?.vote ?? null}
           disabled={room.phase !== 'voting'}
-          onSelect={(value: CardValue) => room.vote({ type: 'VOTE', vote: value })}
+          onSelect={(value) => room.vote({ type: 'VOTE', vote: value })}
         />
       </section>
 

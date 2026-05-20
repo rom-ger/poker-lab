@@ -29,7 +29,7 @@ export type ConnectionStatus =
   | 'error'
 
 export type ClientAction =
-  | { type: 'VOTE'; vote: CardValue }
+  | { type: 'VOTE'; vote: CardValue | null }
   | { type: 'REVEAL' }
   | { type: 'RESET' }
   | { type: 'SET_NAME'; name: string }

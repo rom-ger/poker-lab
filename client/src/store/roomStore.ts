@@ -109,7 +109,11 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         if (!p || phase !== 'voting') return null
         players = {
           ...players,
-          [from]: { ...p, vote: action.vote, hasVoted: true },
+          [from]: {
+            ...p,
+            vote: action.vote,
+            hasVoted: action.vote != null,
+          },
         }
         if (allPlayersVoted(players)) {
           phase = 'revealed'
