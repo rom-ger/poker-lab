@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import type { CardValue, Player, VotePhase } from '../types'
+import { VotePickerPopover } from './VotePickerPopover'
 
 interface Props {
   players: Player[]
@@ -6,6 +8,7 @@ interface Props {
   myId: string
   isHost?: boolean
   onRemove?: (playerId: string) => void
+  onSetVote?: (playerId: string, vote: CardValue | null) => void
 }
 
 const AVATAR_COLORS = [
@@ -46,7 +49,10 @@ export function PlayerList({
   myId,
   isHost = false,
   onRemove,
+  onSetVote,
 }: Props) {
+  const [editingVoteFor, setEditingVoteFor] = useState<string | null>(null)
+
   if (players.length === 0) {
     return (
       <p className="py-6 text-center text-sm text-slate-400">Пока никого нет</p>
@@ -59,15 +65,19 @@ export function PlayerList({
         const voted = p.hasVoted
         const showVote = phase === 'revealed' || p.id === myId
         const canRemove = isHost && p.id !== myId && onRemove
+        const canSetVote =
+          isHost && phase === 'voting' && p.id !== myId && onSetVote
         const isMe = p.id === myId
+        const isEditing = editingVoteFor === p.id
 
         return (
           <li
             key={p.id}
             className={[
-              'flex items-center gap-2.5 rounded-lg border px-2.5 py-2',
+              'relative flex items-center gap-2.5 rounded-lg border px-2.5 py-2',
               isMe ? 'border-indigo-200 bg-indigo-50/50' : 'border-slate-100 bg-slate-50/50',
-              !p.connected && 'opacity-40',
+              p.isFake && 'border-dashed',
+              !p.connected && !p.isFake && 'opacity-40',
             ].join(' ')}
           >
             <div
@@ -75,20 +85,49 @@ export function PlayerList({
             >
               {initials(p.name)}
             </div>
-            <p className="min-w-0 flex-1 truncate text-sm text-slate-800">
-              {p.name}
-            </p>
-            <div
-              className={[
-                'flex h-7 min-w-[1.75rem] shrink-0 items-center justify-center rounded-md border text-xs font-semibold',
-                showVote && phase === 'revealed'
-                  ? 'border-slate-200 bg-white text-slate-800'
-                  : voted
-                    ? 'border-emerald-200 bg-emerald-50 text-emerald-600'
-                    : 'border-slate-100 bg-white text-slate-300',
-              ].join(' ')}
-            >
-              {showVote ? displayVote(p.vote, phase) : voted ? '✓' : '·'}
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm text-slate-800">{p.name}</p>
+              {p.isFake && (
+                <p className="text-[10px] text-slate-400">фейковый</p>
+              )}
+            </div>
+            <div className="relative">
+              {canSetVote ? (
+                <button
+                  type="button"
+                  onClick={() => setEditingVoteFor(isEditing ? null : p.id)}
+                  title="Указать карту голоса"
+                  className={[
+                    'flex h-7 min-w-[1.75rem] shrink-0 items-center justify-center rounded-md border text-xs font-semibold transition',
+                    voted
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-600 hover:border-emerald-300'
+                      : 'border-slate-100 bg-white text-slate-300 hover:border-indigo-200 hover:text-indigo-400',
+                    isEditing && 'ring-1 ring-indigo-400',
+                  ].join(' ')}
+                >
+                  {voted ? '✓' : '·'}
+                </button>
+              ) : (
+                <div
+                  className={[
+                    'flex h-7 min-w-[1.75rem] shrink-0 items-center justify-center rounded-md border text-xs font-semibold',
+                    showVote && phase === 'revealed'
+                      ? 'border-slate-200 bg-white text-slate-800'
+                      : voted
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-600'
+                        : 'border-slate-100 bg-white text-slate-300',
+                  ].join(' ')}
+                >
+                  {showVote ? displayVote(p.vote, phase) : voted ? '✓' : '·'}
+                </div>
+              )}
+              {isEditing && onSetVote && (
+                <VotePickerPopover
+                  current={p.vote}
+                  onSelect={(vote) => onSetVote(p.id, vote)}
+                  onClose={() => setEditingVoteFor(null)}
+                />
+              )}
             </div>
             {canRemove && (
               <button

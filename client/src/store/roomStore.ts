@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { randomUUID } from '../lib/randomId'
 import type {
   ClientAction,
   ConnectionStatus,
@@ -149,6 +150,41 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         delete next[action.targetId]
         players = next
         if (phase === 'voting' && allPlayersVoted(players)) {
+          phase = 'revealed'
+        }
+        break
+      }
+      case 'ADD_FAKE_PLAYER': {
+        if (from !== s.hostId) return null
+        const trimmed = action.name.trim()
+        if (!trimmed) return null
+        const id = `fake-${randomUUID()}`
+        players = {
+          ...players,
+          [id]: {
+            id,
+            name: trimmed,
+            vote: null,
+            hasVoted: false,
+            connected: true,
+            isFake: true,
+          },
+        }
+        break
+      }
+      case 'SET_PLAYER_VOTE': {
+        if (from !== s.hostId || phase !== 'voting') return null
+        const p = ensure(action.targetId)
+        if (!p) return null
+        players = {
+          ...players,
+          [action.targetId]: {
+            ...p,
+            vote: action.vote,
+            hasVoted: action.vote != null,
+          },
+        }
+        if (allPlayersVoted(players)) {
           phase = 'revealed'
         }
         break

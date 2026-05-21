@@ -7,6 +7,7 @@ import { JoinNameForm } from '../components/JoinNameForm'
 import { Header } from '../components/Header'
 import { LoadingState } from '../components/LoadingState'
 import { PlayerList } from '../components/PlayerList'
+import { AddFakePlayerForm } from '../components/AddFakePlayerForm'
 import { RoomControls } from '../components/RoomControls'
 import { useRoom } from '../hooks/useRoom'
 import { calculateAverage } from '../lib/average'
@@ -169,7 +170,11 @@ function RoomContent({
           myId={peerId}
           isHost={room.isHost}
           onRemove={room.isHost ? room.removePlayer : undefined}
+          onSetVote={room.isHost ? room.setPlayerVote : undefined}
         />
+        {room.isHost && (
+          <AddFakePlayerForm onAdd={room.addFakePlayer} />
+        )}
       </section>
     </main>
   )

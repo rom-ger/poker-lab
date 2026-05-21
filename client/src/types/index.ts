@@ -12,6 +12,8 @@ export interface Player {
   vote: CardValue | null
   hasVoted: boolean
   connected: boolean
+  /** Участник добавлен хостом без P2P-подключения */
+  isFake?: boolean
 }
 
 export interface RoomState {
@@ -34,6 +36,8 @@ export type ClientAction =
   | { type: 'RESET' }
   | { type: 'SET_NAME'; name: string }
   | { type: 'REMOVE_PLAYER'; targetId: string }
+  | { type: 'ADD_FAKE_PLAYER'; name: string }
+  | { type: 'SET_PLAYER_VOTE'; targetId: string; vote: CardValue | null }
 
 export type DataMessage =
   | { type: 'STATE'; payload: RoomState }

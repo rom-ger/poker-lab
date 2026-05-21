@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react'
 import { STORAGE_HOST_ROOM_KEY } from '../lib/constants'
 import { peerManager } from '../lib/peerManager'
 import { createInitialState, useRoomStore } from '../store/roomStore'
-import type { ClientAction, DataMessage } from '../types'
+import type { ClientAction, DataMessage, CardValue } from '../types'
 
 function hostBackoff(peerId: string): number {
   let h = 0
@@ -296,8 +296,19 @@ export function useRoom(
     reset: () => sendAction({ type: 'RESET' }),
     removePlayer: (targetId: string) => {
       if (!isHost() || targetId === useRoomStore.getState().peerId) return
-      peerManager.closePeer(targetId)
+      const player = useRoomStore.getState().players[targetId]
+      if (player && !player.isFake) {
+        peerManager.closePeer(targetId)
+      }
       sendAction({ type: 'REMOVE_PLAYER', targetId })
+    },
+    addFakePlayer: (name: string) => {
+      if (!isHost()) return
+      sendAction({ type: 'ADD_FAKE_PLAYER', name })
+    },
+    setPlayerVote: (targetId: string, vote: CardValue | null) => {
+      if (!isHost()) return
+      sendAction({ type: 'SET_PLAYER_VOTE', targetId, vote })
     },
     scheduleReconnect,
   }
