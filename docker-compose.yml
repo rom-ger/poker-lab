@@ -1,0 +1,5 @@
+services:
+  poker-bot:
+    build: ./bot
+    env_file: bot/.env
+    restart: unless-stopped

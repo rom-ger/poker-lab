@@ -1,0 +1,7 @@
+Metadata-Version: 2.4
+Name: poker-bot
+Version: 0.1.0
+Summary: Planning Poker Telegram bot
+Requires-Python: >=3.11
+Requires-Dist: telethon>=1.36.0
+Requires-Dist: python-dotenv>=1.0.0

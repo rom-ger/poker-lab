@@ -5,3 +5,7 @@ dist
 *.log
 .DS_Store
 .env.production
+bot/.env
+bot/.venv
+__pycache__/
+*.pyc
