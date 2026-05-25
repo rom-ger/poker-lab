@@ -1,5 +1,5 @@
 from poker_bot.domain.cards import CardValue
-from poker_bot.state.round_store import RoundState, RoundStore, VotePhase
+from poker_bot.state.round_store import Participant, RoundState, RoundStore, VotePhase
 
 
 class RoundService:
@@ -15,7 +15,7 @@ class RoundService:
         message_id: int,
         initiator_id: int,
         initiator_name: str,
-        participants: dict[int, str],
+        participants: dict[int, Participant],
     ) -> RoundState:
         state = RoundState(
             chat_id=chat_id,

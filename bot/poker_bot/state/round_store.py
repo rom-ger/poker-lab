@@ -7,13 +7,19 @@ VotePhase = Literal["voting", "revealed"]
 
 
 @dataclass
+class Participant:
+    display_name: str
+    username: str | None = None
+
+
+@dataclass
 class RoundState:
     chat_id: int
     message_id: int
     initiator_id: int
     initiator_name: str
     phase: VotePhase
-    participants: dict[int, str]
+    participants: dict[int, Participant]
     votes: dict[int, CardValue] = field(default_factory=dict)
 
 

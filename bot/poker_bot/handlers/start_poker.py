@@ -1,7 +1,7 @@
 from telethon import TelegramClient, events
 from telethon.tl.types import User
 
-from poker_bot.services.members import MembersFetchError, fetch_participants
+from poker_bot.services.members import MembersFetchError, fetch_participants, format_participant, participant_from_user
 from poker_bot.services.round_service import RoundService
 from poker_bot.ui.keyboards import voting_keyboard
 from poker_bot.ui.messages import format_cancelled_message, format_voting_message
@@ -21,7 +21,8 @@ def register_start_poker(client: TelegramClient, rounds: RoundService) -> None:
         if not isinstance(sender, User):
             return
 
-        initiator_name = _user_display_name(sender)
+        initiator = participant_from_user(sender)
+        initiator_name = format_participant(initiator)
         chat_id = event.chat_id
 
         previous = rounds.cancel_round(chat_id)
@@ -42,7 +43,7 @@ def register_start_poker(client: TelegramClient, rounds: RoundService) -> None:
             await event.reply(str(exc))
             return
 
-        participants[sender.id] = initiator_name
+        participants[sender.id] = initiator
 
         message = await event.reply(
             format_voting_message(
@@ -61,12 +62,3 @@ def register_start_poker(client: TelegramClient, rounds: RoundService) -> None:
         state = rounds.get(chat_id)
         if state is not None:
             state.message_id = message.id
-
-
-def _user_display_name(user: User) -> str:
-    parts = [p for p in (user.first_name, user.last_name) if p]
-    if parts:
-        return " ".join(parts)
-    if user.username:
-        return f"@{user.username}"
-    return str(user.id)
