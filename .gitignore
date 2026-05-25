@@ -1,11 +1,9 @@
-node_modules
-dist
 .env
 .env.local
 *.log
 .DS_Store
-.env.production
 bot/.env
 bot/.venv
+bot/poker_bot.egg-info/
 __pycache__/
 *.pyc

@@ -1,85 +1,93 @@
-# Planning Poker (P2P + PeerJS Cloud)
+# Planning Poker — Telegram Bot
 
-MVP Planning Poker: состояние комнаты только в браузерах, синхронизация по WebRTC Data Channels. **Signaling — PeerJS Cloud** (`0.peerjs.com`), свой сервер не нужен.
+Telegram-бот для Planning Poker в групповых чатах. Запускает раунд голосования по команде `/start_poker`, показывает inline-кнопки с картами Фибоначчи и автоматически раскрывает результат, когда все участники проголосовали.
 
-## Архитектура
+## Требования
 
+- Python 3.11+
+- Docker и Docker Compose (для контейнерного запуска)
+- Telegram-бот ([@BotFather](https://t.me/BotFather))
+- `TELEGRAM_API_ID` и `TELEGRAM_API_HASH` с [my.telegram.org](https://my.telegram.org/apps)
+
+## Настройка credentials
+
+### 1. Bot token
+
+Создайте бота через [@BotFather](https://t.me/BotFather) и скопируйте токен в `BOT_TOKEN`.
+
+### 2. API ID и API Hash
+
+1. Войдите на [my.telegram.org/apps](https://my.telegram.org/apps).
+2. Создайте приложение (если ещё нет):
+   - **Short name** — только латиница и цифры, без пробелов и `_`, например `pokerlabbot2026`
+   - **URL** — можно оставить пустым
+   - **Platform** — Desktop
+3. Скопируйте **api_id** → `TELEGRAM_API_ID`, **api_hash** → `TELEGRAM_API_HASH`.
+
+### 3. Файл окружения
+
+```bash
+cp bot/.env.example bot/.env
+# заполните BOT_TOKEN, TELEGRAM_API_ID, TELEGRAM_API_HASH
 ```
-Статика (Vite build)  ──HTTPS──►  GitHub Pages / Netlify / …
-                                        │
-                         wss://0.peerjs.com (только SDP/ICE)
-                                        │
-Browser A ◄══════ WebRTC Data Channel (STATE / ACTION) ══════► Browser B
-```
 
-- **Host** регистрирует Peer ID `poker-{roomId}` на PeerJS Cloud.
-- **Гости** подключаются к этому ID (`peer.connect`).
-- Голоса и фазы идут **напрямую** между браузерами после handshake.
+## Добавление в группу
+
+1. Добавьте бота в групповой чат.
+2. **Сделайте бота администратором** — иначе Telegram не отдаст полный список участников.
+3. Отправьте `/start_poker` в чате.
+
+## Команды бота
+
+| Действие | Описание |
+|---|---|
+| `/start_poker` | Запустить новый раунд (перезапускает активный) |
+| Кнопки карт | Проголосовать (можно менять голос до reveal) |
+| **Завершить раунд** | Досрочно показать среднее — только инициатор |
+| **Начать новый раунд** | Сбросить голоса — только инициатор |
 
 ## Локальный запуск
 
 ```bash
-cd client
-npm install
-npm run dev
+make install   # один раз: создаёт bot/.venv и ставит зависимости
+make dev
 ```
 
-Откройте http://localhost:5173 — signaling сразу идёт на PeerJS Cloud (интернет обязателен).
-
-## Деплой (только статика)
+Вручную:
 
 ```bash
-cd client
-npm run build
-# залить содержимое client/dist на хостинг
+cd bot
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
+python -m poker_bot.main
 ```
 
-### Роутинг: HashRouter
+## Docker
 
-Ссылки вида `https://poker-lab.spisoknado.ru/#/room/abc123` — сервер отдаёт только `index.html`, отдельная настройка nginx не нужна.
-
-**Переменные окружения не обязательны** — по умолчанию `0.peerjs.com`.
-
-Опционально в `.env.production`:
-
-```
-VITE_PEERJS_HOST=0.peerjs.com
-VITE_PEERJS_PORT=443
-VITE_PEERJS_SECURE=true
+```bash
+cp bot/.env.example bot/.env   # заполнить значения
+make run                         # собрать и запустить в фоне
+make logs
+make stop
 ```
 
-## Как пользоваться
+## Структура
 
-1. **Создать комнату** — вы становитесь host, в URL будет `?create=1`.
-2. **Скопировать ссылку** без `create=1` для коллег (или целиком — гость подключится к host).
-3. Голосуйте → host жмёт «Показать голоса» → «Новый раунд».
-
-## Host migration (best-effort)
-
-Если host закрыл вкладку, гости ждут и пробуют переподключиться. Один из участников может занять `poker-{roomId}` (с задержкой по `peerId`) и продолжить с последним известным state.
+```
+bot/
+├── Dockerfile
+├── pyproject.toml
+├── .env.example
+└── poker_bot/          # исходники бота
+```
 
 ## Ограничения
 
-- Зависимость от **PeerJS Cloud** (бесплатный, без SLA).
-- **Разные сети / NAT:** без TURN P2P может не установиться (в Firefox: `ICE failed`, в Chrome — вечный спиннер).
-- Встроенный TURN PeerJS (`turn.peerjs.com`) **отключён** — он часто не работает.
-- Публичный Peer ID комнаты `poker-{roomId}` — любой, кто знает ID, может попытаться войти.
-
-### TURN (если гость не подключается)
-
-1. Зарегистрируйтесь на [Metered Open Relay](https://www.metered.ca/tools/openrelay/) (или свой coturn).
-2. В `client/.env.production`:
-
-```
-VITE_TURN_URLS=turn:standard.relay.metered.ca:80,turn:standard.relay.metered.ca:443
-VITE_TURN_USERNAME=...
-VITE_TURN_CREDENTIAL=...
-```
-
-3. `npm run build` и задеплойте заново.
-
-**Быстрая проверка:** хост и гость в **одной Wi‑Fi** — часто работает и без TURN.
+- Состояние раундов хранится **в памяти** — рестарт бота сбрасывает активные раунды.
+- Участники фиксируются **snapshot'ом** на момент `/start_poker`.
+- Карты `?` и `☕` не участвуют в расчёте среднего.
 
 ## Стек
 
-React · TypeScript · Vite · Tailwind · Zustand · PeerJS · WebRTC
+Python · Telethon · Docker
